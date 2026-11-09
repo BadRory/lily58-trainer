@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lily58 Touch-Type Trainer</title>
+<style>
+  :root {
+    --bg: #11131a;
+    --panel: #1b1e28;
+    --panel-2: #232735;
+    --ink: #e7eaf3;
+    --muted: #8b93a7;
+    --accent: #6ea8fe;
+    --good: #5bd6a0;
+    --bad: #ff6b81;
+    --warn: #ffcc66;
+    --key: #2a2f40;
+    --key-edge: #10131b;
+    --radius: 12px;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; letter-spacing: 0.2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid #2a2f40;
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .stat .val { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .stat .val small { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+  .typebox {
+    background: var(--panel);
+    border: 1px solid #2a2f40;
+    border-radius: var(--radius);
+    padding: 26px 24px;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .prompt {
+    font-family: var(--mono);
+    font-size: 26px;
+    line-height: 1.7;
+    letter-spacing: 0.5px;
+    word-spacing: 2px;
+    user-select: none;
+  }
+  .prompt .ch { position: relative; padding: 1px 0; }
+  .prompt .pending { color: var(--muted); }
+  .prompt .correct { color: var(--good); }
+  .prompt .wrong { color: var(--bad); background: rgba(255,107,129,0.14); border-radius: 3px; }
+  .prompt .cursor {
+    color: var(--ink);
+    background: var(--accent);
+    border-radius: 3px;
+    animation: blink 1s steps(1) infinite;
+  }
+  .prompt .space.wrong { background: rgba(255,107,129,0.3); }
+  @keyframes blink { 50% { background: transparent; color: var(--ink); } }
+
+  .hidden-input {
+    position: absolute; opacity: 0; pointer-events: none; left: -9999px;
+  }
+  .hint {
+    color: var(--muted); font-size: 12px; margin-top: 10px;
+  }
+  .hint b { color: var(--accent); }
+
+  .fingercue {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 18px; padding: 12px 16px;
+    background: var(--panel-2); border: 1px solid #333a4d; border-radius: 10px;
+    font-size: 17px; font-weight: 600;
+  }
+  .fingercue .dot.big { width: 18px; height: 18px; border-radius: 5px; flex: none; }
+  .fingercue #cueText small { color: var(--muted); font-weight: 500; font-size: 14px; }
+
+  .hands { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-bottom: 22px; }
+  .hand { flex: 1; min-width: 280px; background: var(--panel); border: 1px solid #2a2f40; border-radius: var(--radius); padding: 14px 16px; }
+  .handlabel { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
+  .fingers { display: flex; flex-direction: column; gap: 7px; }
+  .fin {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 6px 10px; border-radius: 8px; background: var(--panel-2);
+    border-left: 4px solid transparent;
+  }
+  .fin b { width: 54px; font-size: 13px; font-weight: 600; }
+  .fin i { font-family: var(--mono); font-size: 13px; color: var(--muted); font-style: normal; letter-spacing: 1px; }
+  .fin.f-lp, .fin.f-rp { border-left-color: #ff6b81; }
+  .fin.f-lr, .fin.f-rr { border-left-color: #ffcc66; }
+  .fin.f-lm, .fin.f-rm { border-left-color: #5bd6a0; }
+  .fin.f-li, .fin.f-ri { border-left-color: #6ea8fe; }
+  .fin.f-th { border-left-color: #b08bff; }
+
+  /* keyboard */
+  .kbwrap { display: flex; justify-content: center; gap: 44px; margin: 8px 0 20px; flex-wrap: wrap; }
+  .half { display: flex; flex-direction: column; gap: 6px; }
+  .krow { display: flex; gap: 6px; justify-content: center; }
+  .key {
+    width: 46px; height: 46px;
+    background: var(--key);
+    border: 1px solid #000;
+    border-bottom: 3px solid var(--key-edge);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 14px; color: var(--ink);
+    position: relative;
+    transition: background 0.08s, transform 0.04s;
+  }
+  .key.home::after {
+    content: ""; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    width: 12px; height: 2px; background: var(--muted); border-radius: 2px;
+  }
+  .key.next { background: var(--accent); color: #0b1020; border-bottom-color: #3a6fd8; }
+  .key.hit-good { background: var(--good); color: #052; }
+  .key.hit-bad { background: var(--bad); color: #300; }
+  .key.thumb { width: 60px; }
+  .key.wide { width: 70px; }
+  .key.spacer { background: transparent; border: none; }
+
+  /* finger legend colours on keycaps */
+  .f-lp { box-shadow: inset 0 0 0 2px #ff6b81; }
+  .f-lr { box-shadow: inset 0 0 0 2px #ffcc66; }
+  .f-lm { box-shadow: inset 0 0 0 2px #5bd6a0; }
+  .f-li { box-shadow: inset 0 0 0 2px #6ea8fe; }
+  .f-ri { box-shadow: inset 0 0 0 2px #6ea8fe; }
+  .f-rm { box-shadow: inset 0 0 0 2px #5bd6a0; }
+  .f-rr { box-shadow: inset 0 0 0 2px #ffcc66; }
+  .f-rp { box-shadow: inset 0 0 0 2px #ff6b81; }
+  .f-th { box-shadow: inset 0 0 0 2px #b08bff; }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .btn {
+    background: var(--panel-2); color: var(--ink); border: 1px solid #333a4d;
+    border-radius: 9px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { background: #2c3243; }
+  .btn.primary { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  .seg { display: inline-flex; background: var(--panel-2); border-radius: 9px; border: 1px solid #333a4d; overflow: hidden; }
+  .seg button { background: transparent; border: none; color: var(--muted); padding: 8px 12px; cursor: pointer; font-size: 13px; font-family: inherit; }
+  .seg button.on { background: var(--accent); color: #0b1020; font-weight: 600; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  .keystats { background: var(--panel); border: 1px solid #2a2f40; border-radius: var(--radius); padding: 16px; }
+  .keystats h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin: 0 0 12px; }
+  .bars { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 8px; }
+  .bar {
+    background: var(--panel-2); border-radius: 7px; padding: 7px 0 5px; text-align: center;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .bar .k { font-size: 15px; }
+  .bar .acc { font-size: 10px; margin-top: 3px; }
+  .bar.weak { outline: 1px solid var(--bad); }
+  footer { color: var(--muted); font-size: 11px; margin-top: 28px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lily58 Touch-Type Trainer</h1>
+  <p class="sub">keybr-style drills, tuned to the Lily58 split. Keep your fingers on the home row. Weak keys show up more often.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="label">WPM</div><div class="val" id="wpm">0</div></div>
+    <div class="stat"><div class="label">Accuracy</div><div class="val" id="acc">100<small>%</small></div></div>
+    <div class="stat"><div class="label">Streak</div><div class="val" id="streak">0</div></div>
+    <div class="stat"><div class="label">Best WPM</div><div class="val" id="best">0</div></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="newRound">New round</button>
+    <div class="seg" id="modeSeg">
+      <button data-mode="keys" class="on">Letter drills</button>
+      <button data-mode="words">Common words</button>
+      <button data-mode="home">Home row</button>
+    </div>
+    <label style="color:var(--muted);font-size:13px;display:inline-flex;gap:6px;align-items:center;">
+      <input type="checkbox" id="showHints" checked /> show next key
+    </label>
+    <button class="btn" id="resetStats">Reset progress</button>
+  </div>
+
+  <div class="typebox" id="typebox">
+    <div class="prompt" id="prompt"></div>
+    <input class="hidden-input" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+    <div class="fingercue" id="fingercue">
+      <span class="dot big" id="cueDot"></span>
+      <span id="cueText">Click here and type</span>
+    </div>
+    <div class="hint">Watch the screen, not your hands. <b id="hintKey"></b></div>
+  </div>
+
+  <div class="kbwrap" id="keyboard"></div>
+
+  <div class="hands" id="hands">
+    <div class="hand">
+      <div class="handlabel">Left hand</div>
+      <div class="fingers">
+        <span class="fin f-lp"><b>pinky</b><i>a q z 1</i></span>
+        <span class="fin f-lr"><b>ring</b><i>s w x 2</i></span>
+        <span class="fin f-lm"><b>middle</b><i>d e c 3</i></span>
+        <span class="fin f-li"><b>index</b><i>f g r t v b 4 5</i></span>
+        <span class="fin f-th"><b>thumb</b><i>space / layers</i></span>
+      </div>
+    </div>
+    <div class="hand">
+      <div class="handlabel">Right hand</div>
+      <div class="fingers">
+        <span class="fin f-th"><b>thumb</b><i>enter / layers</i></span>
+        <span class="fin f-ri"><b>index</b><i>j h u y n m 6 7</i></span>
+        <span class="fin f-rm"><b>middle</b><i>k i , 8</i></span>
+        <span class="fin f-rr"><b>ring</b><i>l o . 9</i></span>
+        <span class="fin f-rp"><b>pinky</b><i>; p ' / \ - 0 bksp</i></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#ff6b81"></i> pinky</span>
+    <span><i class="dot" style="background:#ffcc66"></i> ring</span>
+    <span><i class="dot" style="background:#5bd6a0"></i> middle</span>
+    <span><i class="dot" style="background:#6ea8fe"></i> index</span>
+    <span><i class="dot" style="background:#b08bff"></i> thumb</span>
+    <span>home keys carry a bar</span>
+  </div>
+
+  <div class="keystats">
+    <h2>Per-key accuracy (weak keys drilled more)</h2>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <footer>Progress is saved in this browser only. Lily58 default (QWERTY) layout.</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Lily58 physical layout (QWERTY base, 5 rows incl. number row) ----
+  // Each key: label, the character it produces, finger class.
+  // fingers: lp lr lm li  ri rm rr rp (l/r + pinky/ring/middle/index), th = thumb
+  const LEFT = [
+    [["`","`","f-lp"],["1","1","f-lp"],["2","2","f-lr"],["3","3","f-lm"],["4","4","f-li"],["5","5","f-li"]],
+    [["tab","\t","f-lp wide"],["q","q","f-lp"],["w","w","f-lr"],["e","e","f-lm"],["r","r","f-li"],["t","t","f-li"]],
+    [["ctl","","f-lp wide"],["a","a","f-lp home"],["s","s","f-lr home"],["d","d","f-lm home"],["f","f","f-li home"],["g","g","f-li"]],
+    [["sft","","f-lp wide"],["z","z","f-lp"],["x","x","f-lr"],["c","c","f-lm"],["v","v","f-li"],["b","b","f-li"]],
+    [["","","spacer"],["","","spacer"],["alt","","f-th"],["gui","","f-th"],["low","","f-th"],["spc"," ","f-th thumb"]]
+  ];
+  const RIGHT = [
+    [["6","6","f-ri"],["7","7","f-ri"],["8","8","f-rm"],["9","9","f-rr"],["0","0","f-rp"],["bksp","","f-rp"]],
+    [["y","y","f-ri"],["u","u","f-ri"],["i","i","f-rm"],["o","o","f-rr"],["p","p","f-rp"],["-","-","f-rp"]],
+    [["h","h","f-ri"],["j","j","f-ri home"],["k","k","f-rm home"],["l","l","f-rr home"],[";",";","f-rp home"],["'","'","f-rp"]],
+    [["n","n","f-ri"],["m","m","f-ri"],[",",",","f-rm"],[".",".","f-rr"],["/","/","f-rp"],["\\","\\","f-rp"]],
+    [["ent","\n","f-th thumb"],["rai","","f-th"],["ctl","","f-th"],["","","spacer"],["","","spacer"],["","","spacer"]]
+  ];
+
+  // map a character -> the DOM key element (built later)
+  const keyByChar = {};
+  // map a character -> finger class, filled while building the keyboard
+  const fingerByChar = {};
+
+  const FINGER_NAME = {
+    "f-lp": ["Left pinky", "#ff6b81"],
+    "f-lr": ["Left ring", "#ffcc66"],
+    "f-lm": ["Left middle", "#5bd6a0"],
+    "f-li": ["Left index", "#6ea8fe"],
+    "f-ri": ["Right index", "#6ea8fe"],
+    "f-rm": ["Right middle", "#5bd6a0"],
+    "f-rr": ["Right ring", "#ffcc66"],
+    "f-rp": ["Right pinky", "#ff6b81"],
+    "f-th": ["Thumb", "#b08bff"]
+  };
+
+  // ---- training content ----
+  // keybr-style: start from home row, unlock letters by frequency, weight weak keys.
+  const UNLOCK_ORDER = "fjdkslaghe irutnovmcwyqpzxb".split("");
+  const COMMON_WORDS = ("the of to and a in is it you that he was for on are with as his they at be this from i have or by one had not but what all were when we there can an your which their said if do will each about how up out them then she many some so these would other into has more her two like him see time could no make than first been its who now people my made over did down only way find use may water long little very after words called just where most know get through back much before go good new write our used me man too any day same right look think also around another came come work three must because does part even place well such here take why things help put years different away again off went old number great tell men say small every found still between name should home big give air line set own under read last never us left end along while might next sound below saw something thought both few those always looked show large often together asked house dont world going want school important until form food keep children feet land side without boy once animal life enough took sometimes four head above kind began almost live page got earth need far hand high year mother light country father let night picture being study second soon story since white ever paper hard near sentence better best across during today however sure means knew try told young sun thing whole hear example heard several change answer room against top turned learn point city play toward five himself usually money seen car morning body upon family later turn move face door cut done group true half red fish plants living black eat short").split(/\s+/);
+
+  // state
+  let mode = "keys";
+  let showHints = true;
+  let unlocked = 7; // how many letters from UNLOCK_ORDER are active
+  let target = "";
+  let typed = "";
+  let errorsThisRound = 0;
+  let startTime = null;
+  let correctChars = 0, totalChars = 0;
+  let streak = 0, bestStreak = 0, bestWpm = 0;
+  // per-key: {attempts, hits}
+  let keyStats = {};
+
+  const STORE = "lily58trainer.v1";
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE) || "{}");
+      keyStats = s.keyStats || {};
+      bestWpm = s.bestWpm || 0;
+      unlocked = s.unlocked || 7;
+      mode = s.mode || "keys";
+      showHints = s.showHints !== false;
+    } catch (e) { keyStats = {}; }
+  }
+  function save() {
+    localStorage.setItem(STORE, JSON.stringify({ keyStats, bestWpm, unlocked, mode, showHints }));
+  }
+
+  function keyAcc(ch) {
+    const k = keyStats[ch];
+    if (!k || k.attempts === 0) return 1;
+    return k.hits / k.attempts;
+  }
+
+  // weighted pick: weaker keys (lower acc) picked more
+  function pickLetter(pool) {
+    const weights = pool.map(ch => {
+      const acc = keyAcc(ch);
+      const seen = (keyStats[ch] && keyStats[ch].attempts) || 0;
+      let w = (1 - acc) * 3 + 0.25;
+      if (seen < 10) w += 1.2;
+      return w;
+    });
+    const sum = weights.reduce((a,b)=>a+b,0);
+    let r = Math.random() * sum;
+    for (let i=0;i<pool.length;i++){ r -= weights[i]; if (r<=0) return pool[i]; }
+    return pool[pool.length-1];
+  }
+
+  function buildRound() {
+    const pool = UNLOCK_ORDER.slice(0, unlocked);
+    let out = [];
+    if (mode === "keys") {
+      for (let g=0; g<9; g++) {
+        const len = 3 + Math.floor(Math.random()*3);
+        let w = "";
+        for (let i=0;i<len;i++) w += pickLetter(pool);
+        out.push(w);
+      }
+    } else if (mode === "home") {
+      const home = "asdfjkl;".split("");
+      for (let g=0; g<10; g++) {
+        const len = 3 + Math.floor(Math.random()*3);
+        let w = "";
+        for (let i=0;i<len;i++) w += pickLetter(home);
+        out.push(w);
+      }
+    } else { // words
+      const scored = COMMON_WORDS
+        .filter(w => w.length <= 9)
+        .map(w => {
+          let s = 0;
+          for (const c of w.toLowerCase()) s += (1 - keyAcc(c));
+          return [w, s + Math.random()*0.8];
+        })
+        .sort((a,b)=>b[1]-a[1]);
+      for (let i=0;i<12;i++) out.push(scored[i % scored.length][0]);
+    }
+    target = out.join(" ");
+    typed = "";
+    errorsThisRound = 0;
+    startTime = null;
+    render();
+  }
+
+  function render() {
+    const p = document.getElementById("prompt");
+    p.innerHTML = "";
+    for (let i=0;i<target.length;i++){
+      const span = document.createElement("span");
+      const ch = target[i];
+      span.className = "ch" + (ch === " " ? " space" : "");
+      span.textContent = ch === " " ? "\u2423" : ch; // open-box for space
+      if (i < typed.length) {
+        span.classList.add(typed[i] === ch ? "correct" : "wrong");
+      } else if (i === typed.length) {
+        span.classList.add("cursor");
+      } else {
+        span.classList.add("pending");
+      }
+      p.appendChild(span);
+    }
+    highlightNext();
+    updateStats();
+  }
+
+  function highlightNext() {
+    document.querySelectorAll(".key.next").forEach(k => k.classList.remove("next"));
+    if (!showHints) { document.getElementById("hintKey").textContent = ""; return; }
+    const next = target[typed.length];
+    if (next == null) return;
+    const el = keyByChar[next];
+    if (el) el.classList.add("next");
+    const hk = document.getElementById("hintKey");
+    hk.textContent = next === " " ? "next: space" : "next: " + next;
+    updateCue(next);
+  }
+
+  function updateCue(ch) {
+    const dot = document.getElementById("cueDot");
+    const txt = document.getElementById("cueText");
+    if (ch == null) { txt.textContent = "Round complete"; dot.style.background = "transparent"; return; }
+    const fc = ch === " " ? "f-th" : fingerByChar[ch];
+    const info = FINGER_NAME[fc];
+    const shown = ch === " " ? "space" : ch;
+    if (!info) { txt.textContent = shown; dot.style.background = "var(--muted)"; return; }
+    dot.style.background = info[1];
+    txt.innerHTML = info[0] + '  <small>\u2192 ' + shown + '</small>';
+  }
+
+  function flashKey(ch, good) {
+    const el = keyByChar[ch];
+    if (!el) return;
+    el.classList.add(good ? "hit-good" : "hit-bad");
+    setTimeout(()=>el.classList.remove("hit-good","hit-bad"), 120);
+  }
+
+  function updateStats() {
+    const elapsed = startTime ? (Date.now() - startTime) / 1000 : 0;
+    const words = typed.length / 5;
+    const wpm = elapsed > 1 ? Math.round(words / (elapsed/60)) : 0;
+    const acc = totalChars ? Math.round((correctChars/totalChars)*100) : 100;
+    document.getElementById("wpm").textContent = wpm;
+    document.getElementById("acc").innerHTML = acc + '<small>%</small>';
+    document.getElementById("streak").textContent = streak;
+    document.getElementById("best").textContent = bestWpm;
+    renderBars();
+  }
+
+  function renderBars() {
+    const pool = UNLOCK_ORDER.slice(0, Math.max(unlocked, 1));
+    const bars = document.getElementById("bars");
+    bars.innerHTML = "";
+    pool.slice().sort().forEach(ch => {
+      const acc = Math.round(keyAcc(ch)*100);
+      const k = keyStats[ch];
+      const div = document.createElement("div");
+      div.className = "bar" + (acc < 92 && k && k.attempts > 5 ? " weak" : "");
+      const col = acc >= 97 ? "var(--good)" : acc >= 90 ? "var(--warn)" : "var(--bad)";
+      div.innerHTML = '<div class="k">'+ch+'</div><div class="acc" style="color:'+col+'">'+(k&&k.attempts?acc+"%":"\u2014")+'</div>';
+      bars.appendChild(div);
+    });
+  }
+
+  function onKey(e) {
+    if (e.key === "Backspace") {
+      if (typed.length) typed = typed.slice(0, -1);
+      e.preventDefault(); render(); return;
+    }
+    if (e.key.length !== 1) return; // ignore shift, arrows etc.
+    const expected = target[typed.length];
+    if (expected == null) return;
+    if (!startTime) startTime = Date.now();
+
+    const got = e.key;
+    const ch = expected.toLowerCase();
+    keyStats[ch] = keyStats[ch] || { attempts: 0, hits: 0 };
+    keyStats[ch].attempts++;
+    totalChars++;
+
+    const correct = got === expected;
+    if (correct) {
+      keyStats[ch].hits++;
+      correctChars++;
+      streak++;
+      if (streak > bestStreak) bestStreak = streak;
+      flashKey(expected, true);
+    } else {
+      streak = 0;
+      errorsThisRound++;
+      flashKey(expected, false);
+      flashKey(got, false);
+    }
+    typed += got;
+
+    // round complete?
+    if (typed.length >= target.length) {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const wpm = Math.round((typed.length/5) / (elapsed/60));
+      if (wpm > bestWpm && errorsThisRound === 0) bestWpm = wpm;
+      if (errorsThisRound <= 1 && wpm >= 18 && unlocked < UNLOCK_ORDER.length && mode === "keys") {
+        unlocked++;
+      }
+      save();
+      setTimeout(buildRound, 450);
+    } else {
+      render();
+    }
+    save();
+    e.preventDefault();
+  }
+
+  // ---- build keyboard DOM ----
+  function buildHalf(spec, container) {
+    spec.forEach(row => {
+      const r = document.createElement("div");
+      r.className = "krow";
+      row.forEach(([label, chr, cls]) => {
+        const k = document.createElement("div");
+        k.className = "key " + cls;
+        k.textContent = label;
+        if (cls.includes("home")) k.classList.add("home");
+        if (chr && chr.length === 1 && /[a-z0-9`\-=\[\];',.\/ ]/i.test(chr)) {
+          keyByChar[chr] = k;
+          const fc = (cls.match(/f-(?:lp|lr|lm|li|ri|rm|rr|rp|th)/) || [])[0];
+          if (fc) fingerByChar[chr] = fc;
+        }
+        r.appendChild(k);
+      });
+      container.appendChild(r);
+    });
+  }
+
+  function buildKeyboard() {
+    const kb = document.getElementById("keyboard");
+    const left = document.createElement("div"); left.className = "half";
+    const right = document.createElement("div"); right.className = "half";
+    buildHalf(LEFT, left);
+    buildHalf(RIGHT, right);
+    kb.appendChild(left); kb.appendChild(right);
+  }
+
+  // ---- wire up ----
+  function init() {
+    load();
+    buildKeyboard();
+    buildRound();
+
+    const hi = document.getElementById("hiddenInput");
+    document.getElementById("typebox").addEventListener("click", () => hi.focus());
+    hi.addEventListener("keydown", onKey);
+    hi.focus();
+
+    document.getElementById("newRound").addEventListener("click", () => { hi.focus(); buildRound(); });
+
+    document.querySelectorAll("#modeSeg button").forEach(b => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.remove("on"));
+        b.classList.add("on");
+        mode = b.dataset.mode;
+        save(); buildRound(); hi.focus();
+      });
+    });
+    document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.remove("on"));
+    (document.querySelector('#modeSeg button[data-mode="'+mode+'"]')||document.querySelector("#modeSeg button")).classList.add("on");
+
+    const sh = document.getElementById("showHints");
+    sh.checked = showHints;
+    sh.addEventListener("change", () => { showHints = sh.checked; save(); render(); });
+
+    document.getElementById("resetStats").addEventListener("click", () => {
+      if (!confirm("Reset all per-key progress and best WPM?")) return;
+      keyStats = {}; bestWpm = 0; unlocked = 7; streak = 0; totalChars = 0; correctChars = 0;
+      save(); buildRound();
+    });
+
+    document.addEventListener("click", () => hi.focus());
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
